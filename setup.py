@@ -8,7 +8,6 @@ setup(
     packages=[package_name],
     data_files=[
         ('share/ament_index/resource_index/packages', ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml', 'README.md']),
         ('share/' + package_name + '/launch', ['launch/waypoint_manager.launch.py']),
     ],
     install_requires=['setuptools', 'PyQt6'],
