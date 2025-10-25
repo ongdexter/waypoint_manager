@@ -17,7 +17,7 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile
 
 from geometry_msgs.msg import PoseStamped, Point
-from nav_msgs.msg import Path
+from nav_msgs.msg import Path, Odometry
 from std_srvs.srv import Empty
 from visualization_msgs.msg import Marker, MarkerArray
 
@@ -47,6 +47,10 @@ class WaypointsGui(Node):
 
         # subscription
         self.pose_sub = self.create_subscription(PoseStamped, pose_topic, self.pose_cb, qos)
+        # subscribe to odometry to keep waypoint z values aligned with current height
+        # Topic name is intentionally 'odom' per request; can be made configurable later
+        self._current_odom_z = None
+        self.odom_sub = self.create_subscription(Odometry, 'control_odom', self.odom_cb, qos)
 
         # publisher (can be recreated by set_output_topic)
         self.pub = self.create_publisher(Path, self.output_topic, 10)
@@ -194,6 +198,33 @@ class WaypointsGui(Node):
         if len(markers.markers) > 0:
             self.marker_pub.publish(markers)
         self._last_marker_count = len(self._waypoints)
+
+    def odom_cb(self, msg: Odometry):
+        """Update stored waypoint heights to match current odom z.
+
+        This sets the z coordinate of every PoseStamped in self._waypoints to the
+        odometry pose.z. It then republishes markers so the GUI reflects the change.
+        """
+        try:
+            z = msg.pose.pose.position.z
+        except Exception:
+            return
+
+        # store current odom z
+        self._current_odom_z = z
+
+        if not self._waypoints:
+            return
+
+        # update all waypoint z values
+        for ps in self._waypoints:
+            ps.pose.position.z = z
+
+        # update visualization immediately
+        try:
+            self.publish_markers()
+        except Exception:
+            self.get_logger().debug('Failed to publish markers from odom_cb')
 
 
 class MainWindow(QtWidgets.QWidget):
